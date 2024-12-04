@@ -1,0 +1,7 @@
+﻿  example.cpp
+  example_test.cpp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 454 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  task_406099.vcxproj -> D:\Workspace\Turing\rlhf\x64\Release\task_406099.exe
