@@ -1,0 +1,18 @@
+﻿  MemChecker.cpp
+  SomeClass.cpp
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um\winnt.h(173,1): error C1189: #error:  "No Target Architecture"
+  (compiling source file 'MemChecker.cpp')
+  
+D:\Workspace\Turing\rlhf\task_406106\SomeClass.cpp(24,5): error C2039: 'leak_detection_enabled': is not a member of 'testing::UnitTest'
+  D:\Workspace\ThirdParty\googletest-main\googletest\include\gtest\gtest.h(1113,18):
+  see declaration of 'testing::UnitTest'
+  
+D:\Workspace\Turing\rlhf\task_406106\SomeClass.cpp(24,5): error C2512: 'testing::AssertionResult': no appropriate default constructor available
+  D:\Workspace\Turing\rlhf\task_406106\SomeClass.cpp(24,5):
+  'testing::AssertionResult::AssertionResult': no appropriate default constructor available
+  	D:\Workspace\ThirdParty\googletest-main\googletest\include\gtest\gtest-assertion-result.h(155,3):
+  	could be 'testing::AssertionResult::AssertionResult(const T &,std::enable_if<!std::is_convertible<T,testing::AssertionResult>::value,void>::type *)'
+  	D:\Workspace\Turing\rlhf\task_406106\SomeClass.cpp(24,5):
+  	while trying to match the argument list '()'
+  
+D:\Workspace\Turing\rlhf\task_406106\SomeClass.cpp(24,5): error C2737: 'gtest_ar_': const object must be initialized
