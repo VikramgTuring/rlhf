@@ -1,5 +1,8 @@
 ﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(531,5): warning MSB8028: The intermediate directory (x64\Release\) contains files shared from another project (task_406149.vcxproj).  This can lead to incorrect clean and rebuild behavior.
   Turn1ModelA.cpp
-D:\Workspace\Turing\rlhf\task_406149\Turn1ModelA.cpp(32,12): error C3861: 'graphColoringHelper': identifier not found
-D:\Workspace\Turing\rlhf\task_406149\Turn1ModelA.cpp(44,13): error C3861: 'isSafe': identifier not found
-D:\Workspace\Turing\rlhf\task_406149\Turn1ModelA.cpp(69,12): error C1075: '{': no matching token found
+  Generating code
+  1 of 174 functions ( 0.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  task_406149.vcxproj -> D:\Workspace\Turing\rlhf\x64\Release\task_406149_ModelA.exe

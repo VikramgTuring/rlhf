@@ -25,11 +25,13 @@ public:
     }
 };
 
-int minColors(Graph& graph) {
-    int V = graph.getV();
-    vector<int> colors(V, -1); // To store the color of each vertex (-1 means not colored)
-
-    return graphColoringHelper(graph, colors, 0);
+bool isSafe(Graph& graph, vector<int>& colors, int vertex, int color) {
+    for (int neighbor : graph.getNeighbors(vertex)) {
+        if (colors[neighbor] == color) {
+            return false; // If the neighbor has the same color, it's not safe
+        }
+    }
+    return true;
 }
 
 int graphColoringHelper(Graph& graph, vector<int>& colors, int vertex) {
@@ -56,24 +58,21 @@ int graphColoringHelper(Graph& graph, vector<int>& colors, int vertex) {
     return -1;
 }
 
-bool isSafe(Graph& graph, vector<int>& colors, int vertex, int color) {
-    for (int neighbor : graph.getNeighbors(vertex)) {
-        if (colors[neighbor] == color) {
-            return false; // If the neighbor has the same color, it's not safe
-        }
-    }
-    return true;
-}
+int minColors(Graph& graph) {
+    int V = graph.getV();
+    vector<int> colors(V, -1); // To store the color of each vertex (-1 means not colored)
 
+    return graphColoringHelper(graph, colors, 0);
+}
 
 int main() {
     int V = 4;
     Graph graph(V);
 
     graph.addEdge(0, 1);
-    graph.addEdge(0, 2);
+    graph.addEdge(0, 3);
     graph.addEdge(1, 2);
-    graph.addEdge(1, 3);
+    graph.addEdge(1, 4);
     graph.addEdge(2, 3);
 
     int minColorsNeeded = minColors(graph);
@@ -84,3 +83,4 @@ int main() {
     else {
         cout << "No valid coloring possible." << endl;
     }
+}
