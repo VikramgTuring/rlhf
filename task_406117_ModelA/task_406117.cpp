@@ -1,51 +1,40 @@
 #include <iostream>
-#include <vector>
 #include <list>
-#include <string>
-#include <iterator>
 
 int main() {
-    {
-        // Example with std::vector
-        std::vector<int> myVector = { 1, 2, 3, 4, 10, 18 };
+    std::list<int> myList = {1, 2, 3, 4, 5, 5, 6, 7};
 
-        std::cout << "\nstd::vector example:\n";
+    // Display the original list
+    std::cout << "Original list: ";
+    for (auto it = myList.begin(); it != myList.end(); ++it) {
+        std::cout << *it << " ";
+    }
+    std::cout << "\n";
 
-        // Forward iteration
-        std::cout << "Forward iteration: \n";
-        for (auto it = myVector.begin(); it != myVector.end(); ++it) {
-            std::cout << *it << " ";
+    // Element to be removed
+    int elementToRemove = 5;
+
+    // Bidirectional iterators to traverse from both ends
+    auto startIt = myList.begin();
+    auto endIt = myList.end();
+    --endIt; // Move the end iterator to the second last element
+
+    while (startIt != endIt) {
+        if (*startIt == elementToRemove) {
+            myList.erase(startIt);
+        } else if (*endIt == elementToRemove) {
+            myList.erase(endIt);
         }
-        std::cout << "\n";
-
-        // Reverse iteration
-        std::cout << "Reverse iteration: \n";
-        for (auto rit = myVector.rbegin(); rit != myVector.rend(); ++rit) {
-            std::cout << *rit << " ";
-        }
-        std::cout << "\n";
+        ++startIt;
+        --endIt;
     }
 
-    {
-        // Example with std::list
-        std::list<std::string> myList = { "apple", "banana", "orange", "grape" };
-
-        std::cout << "\nstd::list example:\n";
-
-        // Forward iteration
-        std::cout << "Forward iteration: \n";
-        for (auto it = myList.begin(); it != myList.end(); ++it) {
-            std::cout << *it << " ";
-        }
-        std::cout << "\n";
-
-        // Reverse iteration
-        std::cout << "Reverse iteration: \n";
-        for (auto rit = myList.rbegin(); rit != myList.rend(); ++rit) {
-            std::cout << *rit << " ";
-        }
-        std::cout << "\n";
+    // After removing the element, traverse the updated list
+    std::cout << "Updated list after removing " << elementToRemove << ": ";
+    for (auto it = myList.begin(); it != myList.end(); ++it) {
+        std::cout << *it << " ";
     }
+    std::cout << "\n";
 
     return 0;
 }
