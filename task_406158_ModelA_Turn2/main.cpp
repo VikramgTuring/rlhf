@@ -1,23 +1,12 @@
 #include <iostream>
-using namespace std;
-
-class MemoryLeakExample {
-public:
-    MemoryLeakExample() {
-        data = new int[1000]; // Dynamically allocating memory
-    }
-
-    ~MemoryLeakExample() {
-        // We forgot to delete[] the allocated memory, leading to a leak
-    }
-
-private:
-    int* data;
-};
+#include <cstdlib>
 
 int main() {
-    MemoryLeakExample* example = new MemoryLeakExample(); // Creating an object on the heap
-    delete example; // Freeing the object but not the dynamically allocated memory
+    int* ptr = new int;
+    *ptr = 42;
+
+    // We forget to delete ptr, so this will cause a memory leak
+
+    std::cout << "Program execution complete." << std::endl;
     return 0;
 }
-
