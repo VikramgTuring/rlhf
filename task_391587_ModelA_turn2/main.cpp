@@ -1,8 +1,9 @@
 #include <iostream>
-#include <vector>
+#include <memory>
 #include <thread>
-#include <future>
-#include <chrono>
+#include <vector>
+#include <functional>
+#include <mutex>
 
 class Observer {
 public:
@@ -13,61 +14,63 @@ public:
 class Subject {
 public:
     void registerObserver(Observer* observer) {
+        std::lock_guard<std::mutex> lock(observerMutex);
         observers.push_back(observer);
     }
 
     void notifyObservers() {
-        std::vector<std::future<void>> futures;
-
+        std::lock_guard<std::mutex> lock(observerMutex); 
         for (auto observer : observers) {
-            // Create a future to notify the observer asynchronously
-            futures.push_back(std::async(std::launch::async, [observer]() {
-                observer->update();
-            }));
-        }
-        
-        // Optionally, wait for all notifications to finish
-        for (auto& future : futures) {
-            future.get(); // You can choose to handle the results if necessary
+            // Launch the observer's update in a separate thread
+            std::thread(&Observer::update, observer).detach();
         }
     }
 
     void doWork() {
         // Simulate work that notifies observers
+        std::cout << "Subject is doing work...\n";
         for (int i = 0; i < 10000000; ++i) {
-            // Simulate some work
+            // Simulate some processing
         }
         notifyObservers();
     }
 
 private:
     std::vector<Observer*> observers;
+    std::mutex observerMutex; // To protect observer access
 };
 
 class ConcreteObserver : public Observer {
 public:
-    ConcreteObserver(Subject* subject) : subject(subject) {
+    ConcreteObserver(int id, Subject* subject) : id(id), subject(subject) {
         subject->registerObserver(this);
     }
 
     void update() override {
-        // Simulate a long-running task
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulate work delay
-        std::cout << "Observer notified and completed work." << std::endl;
+        // Simulate some long-running task 
+        std::cout << "Observer " << id << " is processing...\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulated work
+        std::cout << "Observer " << id << " finished processing.\n";
     }
 
 private:
+    int id;
     Subject* subject;
 };
 
 int main() {
     Subject subject;
-    const int numObservers = 10;
-    for (int i = 0; i < numObservers; ++i) {
-        ConcreteObserver observer(&subject);
+
+    // Creating observers
+    for (int i = 0; i < 5; ++i) {
+        new ConcreteObserver(i, &subject);
     }
 
+    // Use the Subject to trigger the notifications
     subject.doWork();
+
+    // Wait for a moment to allow all observer tasks to finish
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
     return 0;
 }
