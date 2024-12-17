@@ -1,13 +1,17 @@
 #include <iostream>
 #include <memory>
+#include <thread>
 #include <vector>
+#include <mutex>
+#include <queue>
+#include <condition_variable>
+#include <future>
 
 // Image class representing an image object
 class Image {
 public:
     void display() { std::cout << "Displaying image." << std::endl; }
-
-    // Additional properties and methods can be added (e.g., pixels, size)
+    // Additional properties and methods can be added (e.g. pixels, size)
 };
 
 // Abstract handler for image processing
@@ -15,12 +19,10 @@ class ImageProcessor {
 public:
     virtual ~ImageProcessor() = default;
 
-    // Set the next handler in the chain
     void setNext(std::unique_ptr<ImageProcessor> next) {
         this->next = std::move(next);
     }
 
-    // Process the image and forward to the next handler
     virtual void processImage(Image& image) {
         if (next) {
             next->processImage(image);
@@ -31,7 +33,7 @@ protected:
     std::unique_ptr<ImageProcessor> next;
 };
 
-// Concrete implementation of processing steps
+// Concrete implementations of processing steps
 class BrightnessFilter : public ImageProcessor {
 public:
     void processImage(Image& image) override {
@@ -56,38 +58,107 @@ public:
     }
 };
 
-// Function to build a processing chain from a list of processors
-std::unique_ptr<ImageProcessor> buildProcessingChain(std::vector<std::unique_ptr<ImageProcessor>>& processors) {
-    if (processors.empty()) return nullptr;
+// Thread Pool Class
+class ThreadPool {
+public:
+    ThreadPool(size_t numThreads);
+    ~ThreadPool();
+    
+    template<class F>
+    auto enqueue(F&& f) -> std::future<typename std::result_of<F()>::type>;
 
-    for (size_t i = 0; i < processors.size() - 1; ++i) {
-        processors[i]->setNext(std::move(processors[i + 1]));
+private:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+
+    std::mutex queueMutex;
+    std::condition_variable condition;
+    bool stop;
+};
+
+// Implementation of the Thread Pool
+ThreadPool::ThreadPool(size_t numThreads) : stop(false) {
+    for (size_t i = 0; i < numThreads; ++i) {
+        workers.emplace_back([this] {
+            for (;;) {
+                std::function<void()> task;
+                {
+                    std::unique_lock<std::mutex> lock(this->queueMutex);
+                    this->condition.wait(lock, [this] {
+                        return this->stop || !this->tasks.empty();
+                    });
+                    if (this->stop && this->tasks.empty()) 
+                        return;
+                    task = std::move(this->tasks.front());
+                    this->tasks.pop();
+                }
+                task();
+            }
+        });
     }
+}
 
-    return std::move(processors[0]); // return the first processor
+ThreadPool::~ThreadPool() {
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        stop = true;
+    }
+    condition.notify_all();
+    for (std::thread &worker: workers) {
+        worker.join();
+    }
+}
+
+template<class F>
+auto ThreadPool::enqueue(F&& f) -> std::future<typename std::result_of<F()>::type> {
+    using return_type = typename std::result_of<F()>::type;
+
+    auto task = std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));
+    std::future<return_type> res = task->get_future();
+
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        tasks.emplace([task]() { (*task)(); });
+    }
+    condition.notify_one();
+    return res;
 }
 
 // Example usage
 int main() {
-    // Create some image object
-    Image image;
+    const size_t numImages = 10;
+    const size_t numThreads = 4;
+
+    // Create some dummy images
+    std::vector<Image> images(numImages);
 
     // Create processing steps
-    std::vector<std::unique_ptr<ImageProcessor>> processors;
-    processors.push_back(std::make_unique<BrightnessFilter>());
-    processors.push_back(std::make_unique<ContrastFilter>());
-    processors.push_back(std::make_unique<GrayscaleFilter>());
+    auto brightness = std::make_unique<BrightnessFilter>();
+    auto contrast = std::make_unique<ContrastFilter>();
+    auto grayscale = std::make_unique<GrayscaleFilter>();
 
-    // Build the processing chain
-    auto processingChain = buildProcessingChain(processors);
+    // Set up the chain of responsibility
+    contrast->setNext(std::move(grayscale));
+    brightness->setNext(std::move(contrast));
 
-    // Process the image through the chain
-    if (processingChain) {
-        processingChain->processImage(image);
+    // Create a thread pool
+    ThreadPool pool(numThreads);
+
+    // Vector to hold future results
+    std::vector<std::future<void>> results;
+
+    for (auto& image : images) {
+        // Enqueue the image processing task
+        results.emplace_back(pool.enqueue([&image, &brightness]() {
+            brightness->processImage(image);
+            image.display();  // Can be called after processing
+        }));
     }
 
-    // Display image at the end of processing
-    image.display();
+    // Waiting for all tasks to finish
+    for (auto && result : results) {
+        result.get();
+    }
 
     return 0;
 }
