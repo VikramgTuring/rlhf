@@ -1,84 +1,70 @@
 #include <iostream>
-#include <vector>
-#include <memory>
-#include <algorithm>
 
-// Observer Interface
-class IObserver {
+class Subscriber1 {
 public:
-    virtual ~IObserver() = default;
-    virtual void onNotify() = 0;
+    void handleEvent() {
+        std::cout << "Subscriber1: Event received." << std::endl;
+    }
 };
 
-// Subject Class
-class ISubject {
+class Subscriber2 {
 public:
-    virtual ~ISubject() = default;
-    virtual void attach(std::shared_ptr<IObserver> observer) = 0;
-    virtual void detach(std::shared_ptr<IObserver> observer) = 0;
-    virtual void notify() = 0;
+    void handleEvent() {
+        std::cout << "Subscriber2: Event received." << std::endl;
+    }
 };
 
-// Button Class acting as Subject
-class Button : public ISubject {
+class EventSource {
 public:
-    void click() {
-        std::cout << "Button clicked!" << std::endl;
-        notify();
+    void processEvent() {
+        std::cout << "Event generated." << std::endl;
+        // Legacy code: Notify subscribers directly
+        subscriber1->handleEvent();
+        subscriber2->handleEvent();
     }
 
-    void attach(std::shared_ptr<IObserver> observer) override {
-        observers.push_back(observer);
+    void addSubscriber1(Subscriber1* subscriber) {
+        subscriber1 = subscriber;
     }
 
-    void detach(std::shared_ptr<IObserver> observer) override {
-        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
+    void addSubscriber2(Subscriber2* subscriber) {
+        subscriber2 = subscriber;
     }
+	
+    void removeSubscriber1() {
 
-    void notify() override {
-        for (const auto& observer : observers) {
-            observer->onNotify();
-        }
+        subscriber1 = nullptr;
+
     }
 
 private:
-    std::vector<std::shared_ptr<IObserver>> observers;
-};
 
-// Label Class acting as Observer
-class Label : public IObserver {
-public:
-    void onNotify() override {
-        std::cout << "Label updated because button clicked!" << std::endl;
+    Observer* subscriber1;
+
+    Observer* subscriber2;
+
+    void removeSubscriber1() {
+
+        subscriber1 = nullptr;
+
     }
-};
-
-// Adapter class: Implements the old Button::Label interface while using the Observer Pattern
-class ButtonLegacyAdapter : public Button::Label {
-public:
-    ButtonLegacyAdapter(Button& button) : button(button) {}
-
-    void onButtonClicked() override {
-        // When onButtonClicked is called, notify observers through the new Button class
-        button.notify();
-    }
-
 private:
-    Button& button;
+    Subscriber1* subscriber1;
+    Subscriber2* subscriber2;
 };
 
 int main() {
-    Button button;
+    EventSource eventSource;
 
-    // Using the adapter to bridge the old interface
-    ButtonLegacyAdapter adapter(button);
+    Subscriber1 subscriber1(eventSource);
+    {
 
-    // Using shared pointers for automatic memory management
-    auto label = std::make_shared<Label>();
-    button.attach(label);
+        Subscriber2 subscriber2(eventSource);  // Subscriber2 is in a block scope
 
-    // Legacy code uses the adapter
-    adapter.onButtonClicked();
+    }  // Subscriber2 goes out of scope, but eventSource still holds its pointer
+    
+    eventSource.processEvent(); // Crash! Dangling pointer to Subscriber2 in                   eventSource::subscriber2
+
 
     return 0;
 }
