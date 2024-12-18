@@ -1,74 +1,133 @@
 #include <iostream>
+#include <memory>
 #include <string>
-#include <vector>
+#include <functional>
+#include <thread>
 
-class Subject {
-protected:
-    std::vector<Observer*> observers;
+#define LOG_INFO(msg) (std::cout << "INFO: " << msg << std::endl)
+#define LOG_ERROR(msg) (std::cout << "ERROR: " << msg << std::endl)
 
+// Logger - Decorator Pattern
+class Logger {
 public:
-    void attach(Observer* observer) {
-        observers.push_back(observer);
+    Logger(std::shared_ptr<Logger> next = nullptr) : next_(next) {}
+
+    void log(const std::string& message) {
+        LOG_INFO(message);
+        if (next_) {
+            next_->log(message);
+        }
     }
 
-    void detach(Observer* observer) {
-        for (auto it = observers.begin(); it != observers.end(); ++it) {
-            if (*it == observer) {
-                observers.erase(it);
-                return;
+private:
+    std::shared_ptr<Logger> next_;
+};
+
+class NullLogger : public Logger {
+public:
+    void log(const std::string&) override {}
+};
+
+// Authenticator - Decorator Pattern
+class Authenticator {
+public:
+    Authenticator(std::shared_ptr<Authenticator> next = nullptr) : next_(next) {}
+
+    void authenticate(const std::string& user) {
+        if (user == "valid_user") {
+            if (next_) {
+                next_->authenticate(user);
             }
+        } else {
+            LOG_ERROR("Authentication failed for user: " + user);
+            throw std::runtime_error("Authentication failed");
         }
     }
 
-    void notifyAll() {
-        for (Observer* observer : observers) {
-            observer->update();
+private:
+    std::shared_ptr<Authenticator> next_;
+};
+
+class NullAuthenticator : public Authenticator {
+public:
+    void authenticate(const std::string&) override {}
+};
+
+// Transaction - Template Method Pattern
+class Transaction {
+public:
+    template<typename T>
+    T execute(T(*function)()) {
+        try {
+            std::cout << "Transaction Started..." << std::endl;
+            auto result = function();
+            std::cout << "Transaction Committed" << std::endl;
+            return result;
+        } catch (...) {
+            std::cout << "Transaction Rolled Back" << std::endl;
+            throw;
         }
     }
 };
 
-class Observer {
-protected:
-    Subject* subject;
-    std::string name;
-
+// Order Manager
+class OrderManager {
 public:
-    Observer(Subject* subject, const std::string& name) : subject(subject), name(name) {
-        subject->attach(this);
+    void placeOrder(const std::string& user, double orderAmount) {
+        auto authenticator = std::make_shared<Authenticator>(std::make_shared<NullAuthenticator>());
+        auto logger = std::make_shared<Logger>(std::make_shared<NullLogger>());
+
+        setAuthenticator(authenticator);
+        setLogger(logger);
+
+        try {
+            authenticator->authenticate(user);
+
+            Transaction transaction;
+            transaction.execute<void>([]() {
+                this->processOrder(orderAmount);
+            });
+        } catch (const std::exception& e) {
+            logger->log("Error placing order: " + e.what());
+        }
     }
 
-    virtual ~Observer() {
-        subject->detach(this);
+private:
+    void processOrder(double amount) {
+        std::cout << "Processing order for amount: $" << amount << std::endl;
+        logger_->log("Order processed successfully");
     }
 
-    virtual void update() {
-        std::cout << name << ": Received notification." << std::endl;
+    std::shared_ptr<Authenticator> authenticator_;
+    std::shared_ptr<Logger> logger_;
+
+    void setAuthenticator(std::shared_ptr<Authenticator> authenticator) {
+        authenticator_ = authenticator;
+    }
+
+    void setLogger(std::shared_ptr<Logger> logger) {
+        logger_ = logger;
     }
 };
 
-class UserNotification : public Observer {
-public:
-    UserNotification(Subject* subject, const std::string& name) : Observer(subject, name) {}
-
-    void update() override {
-        std::cout << name << ": Critical User Notification! Processing..." << std::endl;
-        // Simulate critical notification processing
-        // For example, send an email, display a pop-up, etc.
-    }
-};
-
+// Example usage:
 int main() {
-    Subject* notificationCenter = new Subject();
+    OrderManager manager;
 
-    UserNotification* userNotification1 = new UserNotification(notificationCenter, "User A");
-    UserNotification* userNotification2 = new UserNotification(notificationCenter, "User B");
+    manager.placeOrder("valid_user", 100.0);
+    // Output:
+    // Transaction Started...
+    // Authenticating user: valid_user
+    // Processing order for amount: $100
+    // Transaction Committed
+    // Order processed successfully
 
-    // Simulate triggering a critical event
-    notificationCenter->notifyAll();
-
-    delete userNotification1;
-    delete userNotification2;
-    delete notificationCenter;
+    manager.placeOrder("invalid_user", 50.0);
+    // Output:
+    // Transaction Started...
+    // Authenticating user: invalid_user
+    // ERROR: Authentication failed for user: invalid_user
+    // Transaction Rolled Back
 
     return 0;
 }
