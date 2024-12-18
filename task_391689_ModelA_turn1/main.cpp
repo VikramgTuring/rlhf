@@ -1,82 +1,127 @@
 #include <iostream>
-#include <vector>
-#include <string>
-#include <algorithm>
+#include <fstream>
+#include <mutex>
 
-// Observer Interface
-class IObserver {
+class Logger {
 public:
-    virtual ~IObserver() {}
-    virtual void update(const std::string& message) = 0;
-};
+    static Logger& getInstance() {
+        static Logger instance; // Guaranteed to be destroyed.
+        return instance;         // Instantiated on first use.
+    }
 
-// Subject Interface
-class ISubject {
-public:
-    virtual ~ISubject() {}
-    virtual void subscribe(IObserver* observer) = 0;
-    virtual void unsubscribe(IObserver* observer) = 0;
-    virtual void notifyObservers(const std::string& message) = 0;
-};
+    void log(const std::string& message) {
+        std::lock_guard<std::mutex> guard(mutex_);
+        std::ofstream logFile("log.txt", std::ios_base::app);
+        logFile << message << std::endl;
+    }
 
-// Concrete Subject
-class NotificationSystem : public ISubject {
 private:
-    std::vector<IObserver*> observers;
+    Logger() {} // Constructor is private
+    Logger(const Logger&) = delete; // Prevent copying
+    Logger& operator=(const Logger&) = delete; // Prevent assignment
+    std::mutex mutex_;
+};
 
+// Usage
+void processOrder(const std::string& orderID) {
+    Logger::getInstance().log("Processing order: " + orderID);
+    // Further processing logic...
+}
+
+class Order {
 public:
-    void subscribe(IObserver* observer) override {
-        observers.push_back(observer);
-    }
+    virtual void placeOrder(const std::string& orderID) = 0;
+};
 
-    void unsubscribe(IObserver* observer) override {
-        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
+class RealOrder : public Order {
+public:
+    void placeOrder(const std::string& orderID) override {
+        std::cout << "Order placed: " << orderID << std::endl;
     }
+};
 
-    void notifyObservers(const std::string& message) override {
-        for (IObserver* observer : observers) {
-            observer->update(message);
+class SecurityProxy : public Order {
+private:
+    RealOrder realOrder;
+public:
+    void placeOrder(const std::string& orderID) override {
+        if (isUserAuthenticated()) {
+            realOrder.placeOrder(orderID);
+        } else {
+            std::cout << "Access Denied: User is not authenticated." << std::endl;
         }
     }
 
-    // Method to simulate generating notifications
-    void generateNotification(const std::string& message) {
-        std::cout << "Notification generated: " << message << std::endl;
-        notifyObservers(message);
+    bool isUserAuthenticated() {
+        // Simulate user authentication check
+        return true; // Assuming user is authenticated for example
     }
 };
 
-// Concrete Observer
-class User : public IObserver {
-private:
-    std::string name;
+// Usage
+void placeNewOrder(const std::string& orderID) {
+    SecurityProxy proxy;
+    proxy.placeOrder(orderID);
+}
 
+#include <list>
+
+class Observer {
 public:
-    User(const std::string& name) : name(name) {}
+    virtual void update(const std::string& orderID) = 0;
+};
 
-    void update(const std::string& message) override {
-        std::cout << "User " << name << " received notification: " << message << std::endl;
+class TransactionManager {
+private:
+    std::list<Observer*> observers;
+public:
+    void attach(Observer* observer) {
+        observers.push_back(observer);
+    }
+
+    void detach(Observer* observer) {
+        observers.remove(observer);
+    }
+
+    void notify(const std::string& orderID) {
+        for (auto& observer : observers) {
+            observer->update(orderID);
+        }
+    }
+
+    void commitTransaction(const std::string& orderID) {
+        // Commit the transaction logic...
+        notify(orderID);
     }
 };
 
-// Example usage
+class EmailNotification : public Observer {
+public:
+    void update(const std::string& orderID) override {
+        std::cout << "Sending email notification for order: " << orderID << std::endl;
+    }
+};
+
+// Usage
+void processTransaction(const std::string& orderID) {
+    TransactionManager tm;
+    EmailNotification emailNotifier;
+
+    tm.attach(&emailNotifier);
+    tm.commitTransaction(orderID);
+}
+
 int main() {
-    NotificationSystem notificationSystem;
+    std::string orderID = "ORD123";
 
-    User user1("Alice");
-    User user2("Bob");
-    User user3("Charlie");
+    // Logging the order process
+    processOrder(orderID);
 
-    notificationSystem.subscribe(&user1);
-    notificationSystem.subscribe(&user2);
-    notificationSystem.subscribe(&user3);
+    // Placing a new order with security check
+    placeNewOrder(orderID);
 
-    notificationSystem.generateNotification("New message received!");
-    notificationSystem.generateNotification("Your profile has been updated!");
-
-    // Unsubscribe Bob and send another notification
-    notificationSystem.unsubscribe(&user2);
-    notificationSystem.generateNotification("You have a new friend request!");
+    // Processing a transaction with notifications
+    processTransaction(orderID);
 
     return 0;
 }
