@@ -1,98 +1,104 @@
 #include <iostream>
-#include <string>
-#include <memory>
-
-class Order {
-public:
-    Order(const std::string& id, const std::string& details)
-        : id_(id), details_(details) {}
-
-    std::string getId() const { return id_; }
-    std::string getDetails() const { return details_; }
-
-private:
-    std::string id_;
-    std::string details_;
-};
-class Command {
-public:
-    virtual void execute() = 0;
-    virtual ~Command() {}
-};
-
-class ProcessOrderCommand : public Command {
-public:
-    ProcessOrderCommand(std::shared_ptr<Order> order) : order_(order) {}
-
-    void execute() override {
-        // Simulate order processing
-        std::cout << "Processing order: " << order_->getId() << " - " << order_->getDetails() << std::endl;
-    }
-
-private:
-    std::shared_ptr<Order> order_;
-};
-
-#include <queue>
-#include <mutex>
-#include <condition_variable>
-#include <thread>
 #include <vector>
-#include <atomic>
+#include <string>
+#include <algorithm>
+#include <queue>
+#include <functional>
 
-class OrderQueue {
+// Observer Interface
+class IObserver {
 public:
-    void enqueue(std::shared_ptr<Command> command) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        queue_.push(command);
-        condition_.notify_one();
-    }
-
-    std::shared_ptr<Command> dequeue() {
-        std::unique_lock<std::mutex> lock(mutex_);
-        condition_.wait(lock, [this] { return !queue_.empty(); });
-
-        auto command = queue_.front();
-        queue_.pop();
-        return command;
-    }
-
-private:
-    std::queue<std::shared_ptr<Command>> queue_;
-    std::mutex mutex_;
-    std::condition_variable condition_;
+    virtual ~IObserver() {}
+    virtual void update(const std::string& message) = 0;
 };
-void orderConsumer(OrderQueue& orderQueue) {
-    while (true) {
-        auto command = orderQueue.dequeue();
-        command->execute();
-    }
-}
-void orderProducer(OrderQueue& orderQueue, int orderCount) {
-    for (int i = 0; i < orderCount; ++i) {
-        auto order = std::make_shared<Order>("ORD" + std::to_string(i), "Order Details for order " + std::to_string(i));
-        auto command = std::make_shared<ProcessOrderCommand>(order);
-        orderQueue.enqueue(command);
-    }
-}
-int main()
-{
-    int numOrders = 100; // Total orders to process
-    OrderQueue orderQueue;
 
-    // Spawn consumer threads
-    std::vector<std::thread> consumers;
-    for (int i = 0; i < std::thread::hardware_concurrency(); ++i) { // Use available hardware threads
-        consumers.emplace_back(orderConsumer, std::ref(orderQueue));
+// Subject Interface
+class ISubject {
+public:
+    virtual ~ISubject() {}
+    virtual void subscribe(IObserver* observer) = 0;
+    virtual void unsubscribe(IObserver* observer) = 0;
+    virtual void notifyObservers() = 0;
+};
+
+// Notification struct to hold message and priority
+struct Notification {
+    std::string message;
+    int priority;
+
+    // Constructor
+    Notification(const std::string& msg, int pri) : message(msg), priority(pri) {}
+
+    // To make Notification sortable by priority
+    bool operator<(const Notification& other) const {
+        return priority < other.priority; // Lower number means higher priority (e.g., 1 is higher than 2)
+    }
+};
+
+// Concrete Subject
+class NotificationSystem : public ISubject {
+private:
+    std::vector<IObserver*> observers;
+    std::priority_queue<Notification> notifications; // Priority queue to handle notifications
+
+public:
+    void subscribe(IObserver* observer) override {
+        observers.push_back(observer);
     }
 
-    // Order producer
-    orderProducer(orderQueue, numOrders);
-
-    // Join consumer threads (you might want to implement a graceful shutdown)
-    for (auto& consumer : consumers) {
-        consumer.detach(); // Detach for simplicity
+    void unsubscribe(IObserver* observer) override {
+        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
     }
+
+    void addNotification(const std::string& message, int priority) {
+        notifications.emplace(message, priority); // Add notification with priority
+    }
+
+    void notifyObservers() override {
+        while (!notifications.empty()) {
+            Notification notification = notifications.top(); // Get the highest priority notification
+            notifications.pop(); // Remove it from the queue
+
+            for (IObserver* observer : observers) {
+                observer->update(notification.message);
+            }
+        }
+    }
+};
+
+// Concrete Observer
+class User : public IObserver {
+private:
+    std::string name;
+
+public:
+    User(const std::string& name) : name(name) {}
+
+    void update(const std::string& message) override {
+        std::cout << "User " << name << " received notification: " << message << std::endl;
+    }
+};
+
+// Example usage
+int main() {
+    NotificationSystem notificationSystem;
+
+    User user1("Alice");
+    User user2("Bob");
+    User user3("Charlie");
+
+    notificationSystem.subscribe(&user1);
+    notificationSystem.subscribe(&user2);
+    notificationSystem.subscribe(&user3);
+
+    // Adding notifications with different priorities
+    notificationSystem.addNotification("Critical error occurred!", 1); // High priority
+    notificationSystem.addNotification("New message from your friend.", 3); // Medium priority
+    notificationSystem.addNotification("Your profile has been updated.", 2); // Medium priority
+    notificationSystem.addNotification("Reminder: Meeting at 3 PM.", 4); // Low priority
+
+    // Notify observers with priority order
+    notificationSystem.notifyObservers();
 
     return 0;
 }
