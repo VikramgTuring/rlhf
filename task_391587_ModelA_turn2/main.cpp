@@ -1,76 +1,146 @@
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
-#include <functional>
 #include <mutex>
 
+using namespace std;
+
+// Function to measure the execution time of a block of code
+template <typename Func>
+auto measureTime(Func&& func) {
+    auto start = chrono::high_resolution_clock::now();
+    func();
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
+    return duration.count(); // Return in microseconds
+}
+
+// Singleton Class
+class Singleton {
+public:
+    static Singleton& getInstance() {
+        static Singleton instance;
+        return instance;
+    }
+
+    void doWork() {
+        // Simulate work
+        for (volatile int i = 0; i < 1000000; ++i) {}
+    }
+
+private:
+    Singleton() = default;
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
+};
+
+// Factory Class
+class Worker {
+public:
+    virtual void doWork() = 0;
+};
+
+class ConcreteWorker : public Worker {
+public:
+    void doWork() override {
+        for (volatile int i = 0; i < 1000000; ++i) {}
+    }
+};
+
+class Factory {
+public:
+    static unique_ptr<Worker> createWorker() {
+        return make_unique<ConcreteWorker>();
+    }
+};
+
+// Observer Class
 class Observer {
 public:
     virtual void update() = 0;
-    virtual ~Observer() = default;
 };
 
 class Subject {
 public:
     void registerObserver(Observer* observer) {
-        std::lock_guard<std::mutex> lock(observerMutex);
         observers.push_back(observer);
     }
-
     void notifyObservers() {
-        std::lock_guard<std::mutex> lock(observerMutex); 
         for (auto observer : observers) {
-            // Launch the observer's update in a separate thread
-            std::thread(&Observer::update, observer).detach();
+            observer->update();
         }
     }
-
     void doWork() {
-        // Simulate work that notifies observers
-        std::cout << "Subject is doing work...\n";
-        for (int i = 0; i < 10000000; ++i) {
-            // Simulate some processing
-        }
+        for (volatile int i = 0; i < 1000000; ++i) {}
         notifyObservers();
     }
 
 private:
-    std::vector<Observer*> observers;
-    std::mutex observerMutex; // To protect observer access
+    vector<Observer*> observers;
 };
 
 class ConcreteObserver : public Observer {
 public:
-    ConcreteObserver(int id, Subject* subject) : id(id), subject(subject) {
+    ConcreteObserver(Subject* subject) : subject(subject) {
         subject->registerObserver(this);
     }
-
     void update() override {
-        // Simulate some long-running task 
-        std::cout << "Observer " << id << " is processing...\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulated work
-        std::cout << "Observer " << id << " finished processing.\n";
+        for (volatile int i = 0; i < 1000000; ++i) {}
     }
-
 private:
-    int id;
     Subject* subject;
 };
 
-int main() {
-    Subject subject;
+// Thread function for profiling
+template<typename PatternFunc>
+void profilePattern(int threadCount, PatternFunc func) {
+    vector<thread> threads;
+    for (int i = 0; i < threadCount; ++i) {
+        threads.emplace_back(func);
+    }
+    
+    for (auto& th : threads) {
+        th.join();
+    }
+}
 
-    // Creating observers
-    for (int i = 0; i < 5; ++i) {
-        new ConcreteObserver(i, &subject);
+int main() {
+    const int NUM_THREADS = 10;
+
+    {
+        cout << "Profiling Singleton with " << NUM_THREADS << " threads..." << endl;
+        auto time = measureTime([&] {
+            profilePattern(NUM_THREADS, [] {
+                Singleton::getInstance().doWork();
+            });
+        });
+        cout << "Execution time: " << time << " microseconds" << endl;
     }
 
-    // Use the Subject to trigger the notifications
-    subject.doWork();
+    {
+        cout << "Profiling Factory with " << NUM_THREADS << " threads..." << endl;
+        auto time = measureTime([&] {
+            profilePattern(NUM_THREADS, [] {
+                auto worker = Factory::createWorker();
+                worker->doWork();
+            });
+        });
+        cout << "Execution time: " << time << " microseconds" << endl;
+    }
 
-    // Wait for a moment to allow all observer tasks to finish
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    {
+        cout << "Profiling Observer with " << NUM_THREADS << " threads..." << endl;
+        Subject subject;
+        ConcreteObserver observer(&subject);
+        auto time = measureTime([&] {
+            profilePattern(NUM_THREADS, [&subject] {
+                subject.doWork();
+            });
+        });
+        cout << "Execution time: " << time << " microseconds" << endl;
+    }
 
     return 0;
 }
