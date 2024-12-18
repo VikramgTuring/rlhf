@@ -1,94 +1,125 @@
 #include <iostream>
-#include <vector>
-#include <string>
-#include <algorithm>
+#include <thread>
+#include <future>
 #include <queue>
-#include <functional>
-
-// Observer Interface
-class IObserver {
+#include <list>
+#include <mutex>
+#include <condition_variable>
+#include <memory>
+// Factory Pattern
+class Order {
 public:
-    virtual ~IObserver() {}
-    virtual void update(const std::string& message) = 0;
+    virtual void process() = 0;
+    virtual ~Order() = default;
 };
-
-// Subject Interface
-class ISubject {
+std::unique_ptr<Order> createOrder(const std::string& orderDetails) {
+    // Simulate different types of orders, for simplicity, we'll just create one type here.
+    return std::make_unique<SimpleOrder>(orderDetails);
+}
+class SimpleOrder : public Order {
 public:
-    virtual ~ISubject() {}
-    virtual void subscribe(IObserver* observer) = 0;
-    virtual void unsubscribe(IObserver* observer) = 0;
-    virtual void notifyObservers() = 0;
-};
-
-// Concrete Subject
-class NotificationSystem : public ISubject {
+    SimpleOrder(const std::string& details) : details(details) {}
+    void process() override {
+        // Simulate processing
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::cout << "Processing order: " << details << std::endl;
+    }
 private:
-    enum class Priority {
-        HIGH,
-        MEDIUM,
-        LOW
-    };
-
-    std::queue<std::pair<Priority, std::string>> notifications;
-    std::vector<IObserver*> observers;
-
+    std::string details;
+};
+// Thread Pool
+class ThreadPool {
 public:
-    void subscribe(IObserver* observer) override {
-        observers.push_back(observer);
-    }
-
-    void unsubscribe(IObserver* observer) override {
-        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
-    }
-
-    // Method to add notifications with priority
-    void generateNotification(const std::string& message, Priority priority) {
-        notifications.emplace(priority, message);
-    }
-
-    void notifyObservers() override {
-        while (!notifications.empty()) {
-            auto [priority, message] = notifications.front();
-            notifications.pop();
-            std::cout << "Notification generated: " << message << std::endl;
-            for (IObserver* observer : observers) {
-                observer->update(message);
-            }
+    ThreadPool(size_t numThreads) : workers(numThreads) {
+        for (size_t i = 0; i < numThreads; ++i) {
+            workers.emplace_back([this] {
+                while (true) {
+                    std::unique_ptr<Runnable> task;
+                    {
+                        std::unique_lock<std::mutex> lock(taskQueueMutex);
+                        taskQueueCondition.wait(lock, [this] {
+                            return !taskQueue.empty() || stop;
+                        });
+                        if (stop) {
+                            return;
+                        }
+                        task = std::move(taskQueue.front());
+                        taskQueue.pop_front();
+                    }
+                    task->run();
+                }
+            });
         }
     }
-};
-
-// Concrete Observer
-class User : public IObserver {
+    template<typename T>
+    void enqueue(T&& f) {
+        auto task = std::make_shared<Runnable>([f = std::move(f)]() { f(); });
+        {
+            std::unique_lock<std::mutex> lock(taskQueueMutex);
+            taskQueue.push_back(std::move(task));
+        }
+        taskQueueCondition.notify_one();
+    }
+    ~ThreadPool() {
+        {
+            std::unique_lock<std::mutex> lock(taskQueueMutex);
+            stop = true;
+        }
+        taskQueueCondition.notify_all();
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+    }
 private:
-    std::string name;
-
+    struct Runnable {
+        virtual void run() = 0;
+        virtual ~Runnable() = default;
+    };
+    template<typename Callable>
+    class RunnableImpl : public Runnable {
+    public:
+        RunnableImpl(Callable&& callable) : callable(std::move(callable)) {}
+        void run() override {
+            callable();
+        }
+    private:
+        Callable callable;
+    };
+    std::vector<std::thread> workers;
+    std::queue<std::shared_ptr<Runnable>> taskQueue;
+    std::mutex taskQueueMutex;
+    std::condition_variable taskQueueCondition;
+    bool stop = false;
+};
+// Observer Pattern for Order Status Update
+class Observer {
 public:
-    User(const std::string& name) : name(name) {}
-
-    void update(const std::string& message) override {
-        std::cout << "User " << name << " received notification: " << message << std::endl;
+    virtual void update(const std::string& orderID, const std::string& status) = 0;
+};
+class OrderStatusObserver : public Observer {
+public:
+    void update(const std::string& orderID, const std::string& status) override {
+        std::cout << "Order " << orderID << " status updated to: " << status << std::endl;
     }
 };
+class OrderManager {
+public:
+    OrderManager(ThreadPool& threadPool, std::list<Observer*>& observers)
+        : threadPool(threadPool), observers(observers) {}
+    void processOrder(const std::string& orderDetails) {
+        std::unique_ptr<Order> order = createOrder(orderDetails);
+        auto future = threadPool.enqueue([this, order = std::move(order)]() mutable {
+            order->process();
+            notifyObservers(order->details, "Processed");
+        });
+    }
+private:
+    void notifyObservers(const std::string& orderID, const std::string& status) {
+        for (Observer* observer : observers) {
+            observer->update(orderID, status);
+        }
+    }
+    ThreadPool& threadPool;
+    std::list<Observer*>& observers;
+};
 
-// Example usage
-int main() {
-    NotificationSystem notificationSystem;
-
-    User user1("Alice");
-    User user2("Bob");
-
-    notificationSystem.subscribe(&user1);
-    notificationSystem.subscribe(&user2);
-
-    notificationSystem.generateNotification("Low priority task completed.", NotificationSystem::Priority::LOW);
-    notificationSystem.generateNotification("High priority alert: System malfunction!", NotificationSystem::Priority::HIGH);
-    notificationSystem.generateNotification("Medium priority message: Server update available.", NotificationSystem::Priority::MEDIUM);
-    notificationSystem.generateNotification("Low priority message: Weather forecast updated.", NotificationSystem::Priority::LOW);
-    notificationSystem.generateNotification("Medium priority task completed.", NotificationSystem::Priority::MEDIUM);
-
-    notificationSystem.notifyObservers();
-
-    return 0;
-}
