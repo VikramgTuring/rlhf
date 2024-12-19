@@ -1,84 +1,73 @@
 #include <iostream>
 #include <memory>
-#include <map>
+#include <vector>
 #include <string>
 
-// Step 1: Define a service interface
-class IService {
+// Abstract interface for cloud services
+class CloudService {
 public:
-    virtual void Initialize() = 0; // Initialize service state
-    virtual void FetchData() = 0; // Fetch data from the service
-    virtual ~IService() {}
+    virtual void initialize() = 0;
+    virtual void execute() = 0;
+    virtual ~CloudService() = default;
 };
 
-// Step 2: Implement concrete services
-class ServiceA : public IService {
+// EC2 service implementation
+class EC2Service : public CloudService {
 public:
-    void Initialize() override {
-        std::cout << "ServiceA initialized." << std::endl;
+    void initialize() override {
+        std::cout << "Initializing EC2 Service" << std::endl;
     }
 
-    void FetchData() override {
-        std::cout << "Fetching data from Service A." << std::endl;
-    }
-};
-
-class ServiceB : public IService {
-public:
-    void Initialize() override {
-        std::cout << "ServiceB initialized." << std::endl;
-    }
-
-    void FetchData() override {
-        std::cout << "Fetching data from Service B." << std::endl;
+    void execute() override {
+        std::cout << "Executing operations on EC2 instances" << std::endl;
     }
 };
 
-// Step 3: Factory to create services
-class ServiceFactory {
+// RDS service implementation
+class RDSService : public CloudService {
 public:
-    static std::unique_ptr<IService> CreateService(const std::string& serviceType) {
-        if (serviceType == "service_a") {
-            return std::make_unique<ServiceA>();
-        } else if (serviceType == "service_b") {
-            return std::make_unique<ServiceB>();
-        }
-        return nullptr;
+    void initialize() override {
+        std::cout << "Initializing RDS Service" << std::endl;
+    }
+
+    void execute() override {
+        std::cout << "Executing operations on RDS databases" << std::endl;
     }
 };
 
-// Step 4: Context class to use the services
-class ServiceManager {
+// Facade class to interact with multiple services
+class CloudFacade {
 private:
-    std::map<std::string, std::unique_ptr<IService>> services;
+    std::unique_ptr<CloudService> ec2Service;
+    std::unique_ptr<CloudService> rdsService;
 
 public:
-    void AddService(const std::string& serviceType) {
-        auto service = ServiceFactory::CreateService(serviceType);
-        if (service) {
-            service->Initialize(); // Initialize the service
-            services[serviceType] = std::move(service); // Store the service instance
-        } else {
-            std::cerr << "Invalid service type: " << serviceType << std::endl;
-        }
+    CloudFacade() {
+        // Initialize services
+        ec2Service = std::make_unique<EC2Service>();
+        rdsService = std::make_unique<RDSService>();
     }
 
-    void FetchDataForAllServices() {
-        for (auto& pair : services) {
-            pair.second->FetchData(); // Call FetchData for each service
-        }
+    void initializeServices() {
+        ec2Service->initialize();
+        rdsService->initialize();
+    }
+
+    void executeAll() {
+        ec2Service->execute();
+        rdsService->execute();
     }
 };
 
+// Usage of the facade
 int main() {
-    ServiceManager manager;
-
-    // Register services dynamically
-    manager.AddService("service_a");
-    manager.AddService("service_b");
-
-    // Fetch data from all registered services
-    manager.FetchDataForAllServices();
+    CloudFacade cloudFacade;
+    
+    // Initialize services
+    cloudFacade.initializeServices();
+    
+    // Execute operations on all services
+    cloudFacade.executeAll();
 
     return 0;
 }
