@@ -1,56 +1,52 @@
 #include <iostream>
-#include <stdexcept>
 
-template <typename T>
+template<typename T>
 T* cloneArray(const T* original, size_t size) {
-    if (original == nullptr || size == 0) {
-        return nullptr; // Return nullptr for null or zero-size array
-    }
-
-    // Allocate a new array of the same size
-    T* clonedArray = new T[size];
+    // Allocate memory for the new array
+    T* cloned = new T[size];
     
-    // Copy elements from the original array to the cloned array
+    // Copy elements from the original array to the new array
     for (size_t i = 0; i < size; ++i) {
-        clonedArray[i] = original[i];
+        cloned[i] = original[i];
     }
-
-    return clonedArray;
-}
-
-template <typename T>
-void deleteArray(T* array) {
-    delete[] array; // Deallocate the memory for the array
+    
+    return cloned; // Return the cloned array
 }
 
 int main() {
-    // Example usage with an integer array
+    // Example with an array of integers
     int originalIntArray[] = {1, 2, 3, 4, 5};
-    size_t size = sizeof(originalIntArray) / sizeof(originalIntArray[0]);
+    size_t intArraySize = sizeof(originalIntArray) / sizeof(originalIntArray[0]);
 
-    int* clonedIntArray = cloneArray(originalIntArray, size);
-    
+    // Use cloneArray to create a clone of the integer array
+    int* clonedIntArray = cloneArray(originalIntArray, intArraySize);
+
+    // Print cloned integer array
     std::cout << "Cloned Integer Array: ";
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; i < intArraySize; ++i) {
         std::cout << clonedIntArray[i] << " ";
     }
     std::cout << std::endl;
 
-    deleteArray(clonedIntArray); // Clean up dynamically allocated memory
+    // Clean up the allocated memory
+    delete[] clonedIntArray;
 
-    // Example usage with a double array
-    double originalDoubleArray[] = {1.1, 2.2, 3.3};
-    size_t doubleSize = sizeof(originalDoubleArray) / sizeof(originalDoubleArray[0]);
+    // Example with an array of doubles
+    double originalDoubleArray[] = {1.1, 2.2, 3.3, 4.4, 5.5};
+    size_t doubleArraySize = sizeof(originalDoubleArray) / sizeof(originalDoubleArray[0]);
 
-    double* clonedDoubleArray = cloneArray(originalDoubleArray, doubleSize);
-    
+    // Use cloneArray to create a clone of the double array
+    double* clonedDoubleArray = cloneArray(originalDoubleArray, doubleArraySize);
+
+    // Print cloned double array
     std::cout << "Cloned Double Array: ";
-    for (size_t i = 0; i < doubleSize; ++i) {
+    for (size_t i = 0; i < doubleArraySize; ++i) {
         std::cout << clonedDoubleArray[i] << " ";
     }
     std::cout << std::endl;
 
-    deleteArray(clonedDoubleArray); // Clean up dynamically allocated memory
+    // Clean up the allocated memory
+    delete[] clonedDoubleArray;
 
     return 0;
 }
