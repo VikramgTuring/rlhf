@@ -1,82 +1,70 @@
 #include <iostream>
 #include <vector>
-#include <cstring>
+#include <type_traits>
+#include <iterator>
 
-using namespace std;
+// Clone function using std::vector
+template<typename T>
+std::vector<T> cloneArray(const std::vector<T>& original) {
+    // Use std::vector's copy constructor for cloning
+    return std::vector<T>(original);
+}
 
-// Example of a complex user-defined class
-class ComplexData {
-public:
-    int id;
-    char* name; // dynamically allocated memory
-    vector<int> numbers; // a container
+// Function template specialized for pointers
+template<typename T>
+std::enable_if_t<std::is_pointer_v<T>, std::vector<std::remove_pointer_t<T>>> 
+cloneArray(T* original, size_t size) {
+    using ElementType = std::remove_pointer_t<T>;
+    std::vector<ElementType> cloned(size);
 
-    // Constructor
-    ComplexData(int id, const char* name) : id(id), numbers() {
-        this->name = new char[strlen(name) + 1]; // allocate memory for name
-        strcpy(this->name, name);
+    // Copy elements from original
+    for (size_t i = 0; i < size; ++i) {
+        cloned[i] = original[i];
     }
+    
+    return cloned;
+}
 
-    // Copy constructor (deep copy)
-    ComplexData(const ComplexData& other) : id(other.id), numbers(other.numbers) {
-        name = new char[strlen(other.name) + 1]; // allocate new memory
-        strcpy(name, other.name);
-    }
-
-    // Destructor
-    ~ComplexData() {
-        delete[] name; // free the allocated memory
-    }
-
-    // Print method for demonstration purposes
-    void print() const {
-        cout << "ID: " << id << ", Name: " << name << ", Numbers: ";
-        for (auto num : numbers) {
-            cout << num << " ";
-        }
-        cout << endl;
-    }
+// Validates the array with Concepts (C++20 version for validation and better type restriction)
+template <typename T>
+concept Clonable = requires(T a) {
+    { std::remove_pointer_t<std::decay_t<T>>{} };
 };
 
-// Template to clone an array of complex data
-template <typename T>
-T* cloneArray(const T* arr, size_t size) {
-    T* clonedArray = new T[size]; // allocate memory for the cloned array
-    for (size_t i = 0; i < size; i++) {
-        clonedArray[i] = arr[i]; // use the copy constructor for deep copy
+// Conceptually validate before calling the clone function
+template<Clonable T>
+std::vector<std::remove_pointer_t<T>> clone(T original, size_t size) {
+    if constexpr (std::is_pointer_v<T>) {
+        return cloneArray(original, size); // Call pointer-specific overload
+    } else {
+        return cloneArray(original）； // Call vector overload
     }
-    return clonedArray;
 }
 
 int main() {
-    // Create an array of ComplexData
-    const size_t arraySize = 3;
-    ComplexData complexArray[arraySize] = {
-        ComplexData(1, "Alice"),
-        ComplexData(2, "Bob"),
-        ComplexData(3, "Charlie"),
-    };
+    // Example of cloning a vector of integers
+    std::vector<int> originalVector = {1, 2, 3, 4, 5};
+    auto clonedVector = clone(originalVector);
 
-    // Populate the numbers vector in each ComplexData object
-    for (size_t i = 0; i < arraySize; ++i) {
-        complexArray[i].numbers.push_back(i * 10);
-        complexArray[i].numbers.push_back(i * 10 + 1);
+    // Print cloned vector
+    std::cout << "Cloned Vector: ";
+    for (const auto& elem : clonedVector) {
+        std::cout << elem << " ";
     }
+    std::cout << std::endl;
 
-    // Clone the None complex array
-    ComplexData* clonedArray = cloneArray(complexArray, arraySize);
+    // Example of cloning a C-style array
+    int originalArray[] = {6, 7, 8, 9, 10};
+    size_t arraySize = sizeof(originalArray) / sizeof(originalArray[0]);
 
-    // Demonstrate the functionality
-    for (size_t i = 0; i < arraySize; ++i) {
-        cout << "Original Array Element " << i << ":\n";
-        complexArray[i].print();
-        
-        cout << "Cloned Array Element " << i << ":\n";
-        clonedArray[i].print();
+    auto clonedArray = clone(originalArray, arraySize);
+
+    // Print cloned array
+    std::cout << "Cloned Array: ";
+    for (const auto& elem : clonedArray) {
+        std::cout << elem << " ";
     }
-
-    // Clean up dynamically allocated memory
-    delete[] clonedArray;
+    std::cout << std::endl;
 
     return 0;
 }
