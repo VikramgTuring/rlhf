@@ -1,102 +1,79 @@
 #include <iostream>
-#include <vector>
+using namespace std;
 
-class SimpleContainer {
-public:
-    int value;
-    SimpleContainer() : value(0) {}
+// Helper function to calculate total size for N-dimensional arrays
+template <int... Sizes>
+constexpr int calculateTotalSize() {
+    return (... * Sizes); // Fold expression to compute total size
+}
 
-    // Deep copy constructor
-    SimpleContainer(const SimpleContainer& other) : value(other.value) {}
-
-    // Deep copy assignment operator
-    SimpleContainer& operator=(const SimpleContainer& other) {
-        if (this != &other) {
-            value = other.value;
-        }
-        return *this;
+// Recursive function to copy elements for N-dimensional arrays
+template <typename T, int M, int... Sizes>
+void cloneRecursive(const T (&original)[M][Sizes...], T* cloned, int& index) {
+    for (int i = 0; i < M; ++i) {
+        cloneRecursive(original[i], cloned, index); // Recursive call
     }
-};
+}
 
-class ComplexData {
-public:
-    int data1;
-    SimpleContainer* data2;
-    std::vector<int> data3;
-
-    ComplexData() : data1(0), data2(nullptr) {
-        data3.push_back(1);
-        data3.push_back(2);
+// Base case: Copying elements for 1D arrays
+template <typename T, int M>
+void cloneRecursive(const T (&original)[M], T* cloned, int& index) {
+    for (int i = 0; i < M; ++i) {
+        cloned[index++] = original[i];
     }
+}
 
-    // Deep copy constructor
-    ComplexData(const ComplexData& other) {
-        data1 = other.data1;
-        if (other.data2 != nullptr) {
-            data2 = new SimpleContainer(*other.data2);  // Deep copy of data2
-        } else {
-            data2 = nullptr;
-        }
-        data3 = other.data3;  // std::vector does a deep copy automatically
-    }
+// Clone function for N-dimensional arrays
+template <typename T, int... Sizes>
+T* cloneArrayND(const T (&original)[Sizes...]) {
+    constexpr int totalSize = calculateTotalSize<Sizes...>(); // Total size
+    T* cloned = new T[totalSize];
+    int index = 0;
+    cloneRecursive(original, cloned, index); // Recursive cloning
+    return cloned;
+}
 
-    // Deep copy assignment operator
-    ComplexData& operator=(const ComplexData& other) {
-        if (this != &other) {
-            data1 = other.data1;
-            if (data2 != nullptr) {
-                delete data2;  // Delete old data2
-            }
-            if (other.data2 != nullptr) {
-                data2 = new SimpleContainer(*other.data2);
-            } else {
-                data2 = nullptr;
-            }
-            data3 = other.data3;
-        }
-        return *this;
+// Clone function for 1D arrays
+template <typename T, int Size>
+T* cloneArray1d(const T (&original)[Size]) {
+    T* cloned = new T[Size];
+    for (int i = 0; i < Size; ++i) {
+        cloned[i] = original[i];
     }
-
-    ~ComplexData() {
-        delete data2;  // Remember to delete dynamically allocated memory
-    }
-};
-
-template <typename T>
-T* cloneArray(const T* arr, size_t size) {
-    T* clonedArray = new T[size];
-    for (size_t i = 0; i < size; i++) {
-        clonedArray[i] = arr[i];
-    }
-    return clonedArray;
+    return cloned;
 }
 
 int main() {
-    ComplexData data1;
-    data1.data1 = 10;
-    data1.data2 = new SimpleContainer;
-    data1.data2->value = 20;
-
-    ComplexData arr[] = { data1, { 20, nullptr } };
-    size_t size = sizeof(arr) / sizeof(arr[0]);
-
-    ComplexData* clonedArray = cloneArray(arr, size);
-
-    for (size_t i = 0; i < size; i++) {
-        std::cout << "Cloned array element " << i << ": data1 = " << clonedArray[i].data1 << ", ";
-        if (clonedArray[i].data2 != nullptr) {
-            std::cout << "data2->value = " << clonedArray[i].data2->value << ", ";
-        } else {
-            std::cout << "data2 = nullptr, ";
-        }
-        for (const int& val : clonedArray[i].data3) {
-            std::cout << "data3.val = " << val << ", ";
-        }
-        std::cout << "\n";
+    // 1D Array
+    int originalIntArray[] = {1, 2, 3, 4, 5};
+    int* clonedIntArray = cloneArray1d(originalIntArray);
+    cout << "Cloned 1D Integer Array: ";
+    for (int i = 0; i < 5; ++i) {
+        cout << clonedIntArray[i] << " ";
     }
+    cout << endl;
+    delete[] clonedIntArray;
 
-    // Always delete the dynamically allocated memory
-    delete[] clonedArray;
+    // 2D Array
+    int original2DArray[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    int* cloned2DArray = cloneArrayND(original2DArray);
+    cout << "Cloned 2D Integer Array: ";
+    for (int i = 0; i < 6; ++i) {
+        cout << cloned2DArray[i] << " ";
+    }
+    cout << endl;
+    delete[] cloned2DArray;
+
+    // 3D Array
+    int original3DArray[2][2][2] = {{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}};
+    int* cloned3DArray = cloneArrayND(original3DArray);
+    cout << "Cloned 3D Integer Array: ";
+    for (int i = 0; i < 8; ++i) {
+        cout << cloned3DArray[i] << " ";
+    }
+    cout << endl;
+    delete[] cloned3DArray;
 
     return 0;
 }
+
