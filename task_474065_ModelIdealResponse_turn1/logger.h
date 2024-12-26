@@ -30,12 +30,15 @@ public:
 
 private:
     void process_log_queue() {
-        while (!stop_logging) {
+        while (true) {
             std::unique_lock<std::mutex> lock(mtx);
             cv.wait(lock, [this]() { return !log_queue.empty() || stop_logging; });
             while (!log_queue.empty()) {
                 log_file << log_queue.front() << std::endl;
                 log_queue.pop();
+            }
+            if (stop_logging && log_queue.empty()) {
+                break;
             }
         }
     }
