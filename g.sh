@@ -15,6 +15,9 @@ TURN=$3
 DIR1="task_${TASK_NUM}_Model${MODEL}_turn${TURN}"
  
 # Create the directories
+git stash
+git pull origin main
+git stash pop
 git add $DIR1
 git commit -m "$DIR1"
 git push -u origin main
