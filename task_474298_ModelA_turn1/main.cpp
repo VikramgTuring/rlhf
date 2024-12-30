@@ -1,47 +1,57 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <string>
 
-#define MICROSERVICE_NAME_MAX_LEN 32
-
-struct Transaction {
-    char request_id[256];
-    char source_account[64];
-    char destination_account[64];
-    double amount;
+class PaymentService {
+public:
+    void processPayment(const std::string &userId, double amount) {
+        printf("[PaymentService] Processing payment of $%.2f for user %s...\n", amount, userId.c_str());
+        // Simulate some processing logic
+        if (amount > 1000) {
+            printf("[PaymentService] Warning: High-value payment detected!\n");
+        }
+    }
 };
 
-void log_api_call(char* microservice_name, const struct Transaction* transaction) {
-    if (microservice_name == NULL || transaction == NULL) {
-        fprintf(stderr, "Error: log_api_call: Invalid argument\n");
-        return;
+class FraudDetectionService {
+public:
+    bool checkFraud(const std::string &userId, double amount) {
+        printf("[FraudDetectionService] Checking fraud for user %s on amount $%.2f...\n", userId.c_str(), amount);
+        // Simplified fraud detection logic
+        return amount > 1000; // Simulating a fraud condition
     }
+};
 
-    // Ensure microservice name doesn't overflow the buffer
-    if (strlen(microservice_name) >= MICROSERVICE_NAME_MAX_LEN) {
-        fprintf(stderr, "Error: log_api_call: Microservice name too long\n");
-        return;
+class NotificationService {
+public:
+    void sendNotification(const std::string &userId, const std::string &message) {
+        printf("[NotificationService] Notifying user %s: %s\n", userId.c_str(), message.c_str());
     }
+};
 
-    fprintf(stderr, "[%s] API CALL: %s \n", microservice_name, transaction->request_id);
-    fprintf(stderr, "[%s] Source Account: [************]%s\n", microservice_name,
-        transaction->source_account + strlen(transaction->source_account) - 4);
-    fprintf(stderr, "[%s] Destination Account: [************]%s\n", microservice_name,
-        transaction->destination_account + strlen(transaction->destination_account) - 4);
-    fprintf(stderr, "[%s] Transaction Amount: %.2lf\n\n", microservice_name, transaction->amount);
-}
+class DigitalPaymentSystem {
+private:
+    PaymentService paymentService;
+    FraudDetectionService fraudService;
+    NotificationService notificationService;
+
+public:
+    void makePayment(const std::string &userId, double amount) {
+        paymentService.processPayment(userId, amount);
+
+        if (fraudService.checkFraud(userId, amount)) {
+            notificationService.sendNotification(userId, "Fraud detected! Payment has been blocked.");
+            printf("[DigitalPaymentSystem] Payment blocked due to potential fraud for user %s.\n", userId.c_str());
+        } else {
+            notificationService.sendNotification(userId, "Payment processed successfully.");
+            printf("[DigitalPaymentSystem] Payment of $%.2f successful for user %s.\n", amount, userId.c_str());
+        }
+    }
+};
 
 int main() {
-    struct Transaction transaction = {
-        .request_id = "REQ1234567890ABCDEF",
-        .source_account = "ACC12345678901234567",
-        .destination_account = "ACC98765432109876543",
-        .amount = 100.00
-    };
-
-    log_api_call("payment-service", &transaction);
-    log_api_call("authorization-service", &transaction);
+    DigitalPaymentSystem system;
+    system.makePayment("user123", 500);  // Normal payment
+    system.makePayment("user123", 1500); // Potential fraud payment
 
     return 0;
 }
-
